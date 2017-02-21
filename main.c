@@ -24,6 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DEBUG
+#undef DEBUG
+#define DEBUG 1
+#else
+#define DEBUG 0
+#endif
+
 #define TKN_KEYWD 0
 #define TKN_ID 1
 #define TKN_INT 2
@@ -145,7 +152,7 @@ int main(int argc, char** argv) {
         printf("Error: %d\n", err);
         return err;
     }
-    printf("Init\n");
+    if(DEBUG) printf("Init\n");
     err = lex(input, output);
     if (err) {
         printf("Error: %d\n", err);
@@ -162,11 +169,11 @@ errr lex(FILE * in, FILE * out) {
     regmatch_t pmatch;
     errr err = NOERR;
     while (!feof(in)) {
-        printf("Loop start\n");
+        if(DEBUG) printf("Loop start\n");
         /* Read line */
         fgets(buf, LN_BUFSIZ, in);
         if (ferror(in)) return ERR_IO;
-        printf("Read line\n");
+        if(DEBUG) printf("Read line\n");
         char *line = buf;
         while (*line) {
             while (*line && isspace(*line)) {
@@ -175,20 +182,20 @@ errr lex(FILE * in, FILE * out) {
             if (!*line) break;
             int curkind = -1;
             int curlen = 0;
-            printf("Found token start\n");
+            if(DEBUG) printf("Found token start\n");
             for (int i = 0; i < TKN_MAX; i++) {
-                printf("Regex loop\n");
+                if(DEBUG) printf("Regex loop\n");
                 if ((!regexec(&regexen[i], line, 1, &pmatch, 0))
                         && (pmatch.rm_so == 0) && (pmatch.rm_eo > curlen)) {
                     curkind = i;
                     curlen = pmatch.rm_eo;
                 }
-                printf(
+                if(DEBUG) printf(
                         "End Regex loop: matched %d:%d for token pattern %d. Current token ID is %d, length %d\n",
                         pmatch.rm_so, pmatch.rm_eo, i, curkind, curlen);
             }
             if (curkind == -1) return ERR_PARSE_ERR;
-            printf("Identified token\n");
+            if(DEBUG) printf("Identified token\n");
             char* tok = malloc((curlen + 1) * sizeof(char));
             strncpy(tok, line, curlen);
             tok[curlen] = '\0';
@@ -197,7 +204,7 @@ errr lex(FILE * in, FILE * out) {
             if (err) return err;
         }
     }
-    printf("End tokenizer loop\n");
+    if(DEBUG) printf("End tokenizer loop\n");
     string_list * str_hack_head = NULL;
     string_list * str_hack_tail = NULL;
     uint str_hack_idx = 0;
@@ -205,7 +212,7 @@ errr lex(FILE * in, FILE * out) {
         if (((head->token.type == TKN_ID) || (head->token.type == TKN_STR))
                 && (head->token.subtype == TKN_ALNUM_PTR)) {
             /* Hack -- payload string too long for standard entry. Store strings in list to be written later... */
-            printf("Hacking...");
+            if(DEBUG) printf("Hacking...");
             if (!str_hack_idx) {
                 str_hack_head = (string_list*) malloc(sizeof(string_list));
                 str_hack_tail = str_hack_head;
@@ -214,28 +221,27 @@ errr lex(FILE * in, FILE * out) {
                         sizeof(string_list));
                 str_hack_tail = str_hack_tail->next;
             }
-            printf("For string '%s'", head->token.payload.aid_ptr);
+            if(DEBUG) printf("For string '%s'", head->token.payload.aid_ptr);
             str_hack_tail->str = head->token.payload.aid_ptr;
             /* ... and use fake pointers for writing */
             head->token.payload.aid_ptr = str_hack_idx;
             str_hack_idx++;
-        } else printf("No hack necessary\n");
+        } else if(DEBUG) printf("No hack necessary\n");
         fwrite(&(head->token), sizeof(token_t), 1, out);
         if (ferror(out)) return ERR_IO;
         token_list * del = head;
         head = head->next;
         free(del);
-        printf("Wrote token. Next at %p\n", head);
+        if(DEBUG) printf("Wrote token. Next at %p\n", head);
     }
-    printf("Written tokens\n");
+    if(DEBUG) printf("Written tokens\n");
     token_t sentinel = { .type = TKN_MAX };
     fwrite(&sentinel, sizeof(token_t), 1, out);
-    printf("Written sentinel \n");
+    if(DEBUG) printf("Written sentinel \n");
     fflush(out);
     /* Hack -- now actually store the hacked strings */
     while (str_hack_head != NULL) {
-        printf("Enter string_hack loop.\n");
-        printf("Writing string %p\n"/* '%s'\n", str_hack_head->str*/,
+        if(DEBUG) printf("Writing string %p\n"/* '%s'\n", str_hack_head->str*/,
                 str_hack_head->str);
         fwrite(str_hack_head->str, sizeof(char), strlen(str_hack_head->str) + 1,
                 out);
@@ -247,7 +253,7 @@ errr lex(FILE * in, FILE * out) {
         str_hack_head = str_hack_head->next;
         free(del->str);
         free(del);
-        printf("Written string_hack. Next at %p\n", str_hack_head);
+        if(DEBUG) printf("Written string_hack. Next at %p\n", str_hack_head);
     }
     return NOERR;
 }
@@ -498,10 +504,10 @@ errr make_token(char* tok, int type) {
                 strncpy(tail->token.payload.aid_emb, tmp, 16);
                 free(tmp);
                 tail->token.subtype = TKN_ALNUM_EMB;
-                printf("Embedded string\n");
+                if(DEBUG) printf("Embedded string\n");
             } else {
                 tail->token.subtype = TKN_ALNUM_PTR;
-                printf("Referenced string\n");
+                if(DEBUG) printf("Referenced string\n");
             }
             break;
         case TKN_OPER:
